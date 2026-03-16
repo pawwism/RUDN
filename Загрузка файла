@@ -1,0 +1,56 @@
+import sys
+
+def is_prime(x):
+    if x < 2:
+        return False
+    if x == 2 or x == 3:
+        return True
+    if x % 2 == 0 or x % 3 == 0:
+        return False
+    i = 5
+    while i * i <= x:
+        if x % i == 0 or x % (i + 2) == 0:
+            return False
+        i += 6
+    return True
+
+def solve():
+    try:
+        input_data = sys.stdin.read().split()
+        if not input_data:
+            return
+        n = int(input_data[0])
+    except ValueError:
+        return
+
+    if is_prime(n):
+        print(1)
+        print(n)
+        return
+
+    if n % 2 == 0:
+        p = 2
+        while True:
+            if is_prime(p) and is_prime(n - p):
+                print(2)
+                print(f"{p} {n - p}")
+                return
+            p += 1
+    
+    else:
+        if is_prime(n - 2):
+            print(2)
+            print(f"2 {n - 2}")
+            return
+        
+        remainder = n - 3
+        p = 2
+        while True:
+            if is_prime(p) and is_prime(remainder - p):
+                print(3)
+                print(f"3 {p} {remainder - p}")
+                return
+            p += 1
+
+if __name__ == "__main__":
+    solve()
