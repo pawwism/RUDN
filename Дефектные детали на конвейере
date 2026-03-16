@@ -1,0 +1,35 @@
+import sys
+
+def solve():
+    input_data = sys.stdin.read().split()
+    
+    if not input_data:
+        return
+
+    n = int(input_data[0])
+    k = int(input_data[1])
+    
+
+    a = []
+    for i in range(n):
+        a.append(int(input_data[2 + i]))
+
+   
+    left = 0
+    right = n
+    ans = 0
+    
+    while left < right:
+        mid = (left + right) // 2
+        if a[mid] >= k:
+            
+            ans = mid + 1
+            left = mid + 1
+        else:
+           
+            right = mid
+            
+    print(ans)
+
+if __name__ == "__main__":
+    solve()
