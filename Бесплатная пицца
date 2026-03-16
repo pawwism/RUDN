@@ -1,0 +1,48 @@
+import sys
+
+def solve():
+    sys.setrecursionlimit(2000)
+    
+    input_data = sys.stdin.read().split()
+    
+    if not input_data:
+        return
+
+    iterator = iter(input_data)
+    
+    try:
+        n = int(next(iterator))
+        arr = []
+        for _ in range(n):
+            arr.append(int(next(iterator)))
+    except StopIteration:
+        return
+
+    breakpoints = []
+    
+    for i in range(1, n):
+        if arr[i] < arr[i-1]:
+            breakpoints.append(i)
+    
+    breakpoints.sort()
+    
+    if len(breakpoints) == 1:
+        k = breakpoints[0]
+        m = breakpoints[0]
+        print(f"{k} {m}")
+    elif len(breakpoints) == 2:
+        k = breakpoints[0]
+        m = breakpoints[1]
+        print(f"{k} {m}")
+    else:
+        
+        if len(breakpoints) >= 2:
+            print(f"{breakpoints[0]} {breakpoints[1]}")
+        elif len(breakpoints) == 1:
+            print(f"{breakpoints[0]} {breakpoints[0]}")
+        else:
+            
+            pass
+
+if __name__ == "__main__":
+    solve()
