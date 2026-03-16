@@ -1,0 +1,90 @@
+import sys
+import json
+from bisect import bisect_right
+
+def solve():
+    input_data = sys.stdin.read()
+    if not input_data:
+        return
+    
+    s = input_data.strip()
+    n = len(s)
+    
+    intervals = []
+    
+    decoder = json.JSONDecoder()
+    
+    i = 0
+    while i < n:
+        
+        if s[i].isspace():
+            i += 1
+            continue
+            
+        try:
+
+            obj, end_idx = decoder.raw_decode(s, i)
+            
+            real_start = i
+            while real_start < end_idx and s[real_start].isspace():
+                real_start += 1
+            
+            if real_start >= end_idx:
+                i += 1
+                continue
+                
+            length = end_idx - real_start
+            intervals.append((real_start, end_idx, length))
+            
+            i += 1
+        except json.JSONDecodeError:
+            i += 1
+        except Exception:
+            i += 1
+
+    if not intervals:
+        print("0 0")
+        return
+
+    intervals.sort(key=lambda x: x[1])
+    
+    m = len(intervals)
+    dp = [0] * (m + 1)
+
+    
+    rights = [x[1] for x in intervals]
+    
+    for i in range(1, m + 1):
+        l, r, w = intervals[i-1]
+        
+        
+        idx = bisect_right(rights, l, hi=i-1) 
+        
+        prev_val = dp[idx]
+        
+        if w + prev_val > dp[i-1]:
+            dp[i] = w + prev_val
+        else:
+            dp[i] = dp[i-1]
+            
+    res_intervals = []
+    curr = m
+    while curr > 0:
+        l, r, w = intervals[curr-1]
+        idx = bisect_right(rights, l, hi=curr-1)
+        if dp[curr] == w + dp[idx]:
+            res_intervals.append((l, r))
+            curr = idx
+        else:
+            curr -= 1
+            
+   
+    k = len(res_intervals)
+    total_len = sum(r - l for l, r in res_intervals)
+    
+    print(f"{k} {total_len}")
+    for l, r in res_intervals:
+        print(f"{l} {r}")
+
+if __name__ == "__main__":
+    solve()
