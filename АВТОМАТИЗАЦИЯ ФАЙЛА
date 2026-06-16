@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+print("🔍 Скрипт запущен!")
+import os
+import re
+import time
+import unicodedata
+import requests
+import pandas as pd
+from datetime import datetime
+
+# ------------ НАСТРОЙКИ -------------
+YANDEX_TOKEN = "токен"
+BASE_FOLDER = "расположение"
+OUTPUT_EXCEL = "название.xlsx"
+
+HEADERS = {"Authorization": f"OAuth {YANDEX_TOKEN}"}
+API_DISK = "https://cloud-api.yandex.net/v1/disk/resources"
+API_PUBLISH = "https://cloud-api.yandex.net/v1/disk/resources/publish"
+
+# ------------ ФУНКЦИИ -------------
+
+def normalize(text: str) -> str:
+    if not text:
+        return ""
+    text = str(text)
+    text = unicodedata.normalize("NFKC", text)
+    text = text.replace("\u00A0", " ")
+    text = text.replace("\u200B", "").replace("\uFEFF", "")
+    text = text.replace("_", " ")
+    text = re.sub(r"\s+", " ", text)
+    text = text.strip()
+    return text.lower()
+
+
+def list_png_files(folder_path: str):
+    """Получить список PNG-файлов с таймаутом."""
+    try:
+        r = requests.get(
+            API_DISK, 
+            headers=HEADERS, 
+            params={"path": folder_path, "limit": 1000},
+            timeout=30
+        )
+        r.raise_for_status()
+        data = r.json().get("_embedded", {})
+        items = data.get("items", [])
+        return [
+            item for item in items
+            if item["type"] == "file" and item["name"].lower().endswith(".png")
+        ]
+    except Exception as e:
+        print(f"❌ Ошибка получения списка файлов: {e}")
+        return []
+
+
+def publish_and_get_link(file_path: str, max_retries: int = 3) -> str:
+    """Опубликовать файл и вернуть ссылку. С повторами и таймаутом."""
+    for attempt in range(max_retries):
+        try:
+            r1 = requests.put(
+                API_PUBLISH, 
+                headers=HEADERS, 
+                params={"path": file_path},
+                timeout=30
+            )
+            r1.raise_for_status()
+            
+            time.sleep(0.5)
+            
+            r2 = requests.get(
+                API_DISK, 
+                headers=HEADERS, 
+                params={"path": file_path},
+                timeout=30
+            )
+            r2.raise_for_status()
+            return r2.json().get("public_url", "")
+            
+        except (requests.exceptions.ConnectionError, 
+                requests.exceptions.Timeout,
+                requests.exceptions.HTTPError) as e:
+            wait = 2 * (attempt + 1)
+            print(f"  ⚠️ Сбой (попытка {attempt+1}/{max_retries}). Жду {wait}с...")
+            time.sleep(wait)
+    
+    return "❌ ОШИБКА СЕТИ"
+
+
+def extract_base_name(filename: str):
+    name = filename.replace(".png", "")
+    if name.endswith("_главная"):
+        return name[:-8], "Главная"
+    if name.endswith("_размеры"):
+        return name[:-7], "Размеры"
+    if name.endswith("_выбор"):
+        return name[:-6], "Выбор"
+    return None, None
+
+
+# ------------ ОСНОВНОЙ СКРИПТ -------------
+def main():
+    print(f"[{datetime.now()}] 🚀 Начинаю обработку: {BASE_FOLDER}")
+    files = list_png_files(BASE_FOLDER)
+    
+    if not files:
+        print("❌ PNG-файлы не найдены или ошибка сети")
+        return
+    
+    print(f"🔹 Найдено файлов: {len(files)}")
+    grouped = {}
+    total = len(files)
+    start_time = datetime.now()
+    
+    for i, f in enumerate(files, 1):
+        fname = f["name"]
+        fpath = f["path"]
+        
+        print(f"[{i}/{total}] 📁 {fname}")
+        
+        base_name, kind = extract_base_name(fname)
+        if not base_name:
+            print(f"  ⚠️ Пропуск: неверный формат имени")
+            continue
+        
+        norm_key = normalize(base_name)
+        if norm_key not in grouped:
+            grouped[norm_key] = {
+                "Наименование": base_name,
+                "Главная": "",
+                "Размеры": "",
+                "Выбор": ""
+            }
+        
+        public_link = publish_and_get_link(fpath)
+        grouped[norm_key][kind] = public_link
+        
+        # Сохраняем каждые 10 файлов
+        if i % 10 == 0:
+            df_temp = pd.DataFrame(grouped.values())
+            df_temp.to_excel(OUTPUT_EXCEL, index=False)
+            elapsed = (datetime.now() - start_time).total_seconds()
+            speed = i / elapsed if elapsed > 0 else 0
+            remaining = int((total - i) / speed) if speed > 0 else 0
+            print(f"💾 Сохранено {len(df_temp)} строк | Скорость: {speed:.1f} ф/с | Осталось: ~{remaining}с")
+    
+    df = pd.DataFrame(grouped.values())
+    df.to_excel(OUTPUT_EXCEL, index=False)
+    print(f"\n[{datetime.now()}] ✅ Готово! Excel создан: {OUTPUT_EXCEL}")
+    print(f" Записано строк: {len(df)}")
+
+
+if __name__ == "__main__":
+    main()
